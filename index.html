@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Modelo Bioclimático 3D - Transiciones de Día</title>
+    <title>Modelo Bioclimático 3D - Transiciones Naturales</title>
     <style>
         body {
             margin: 0;
@@ -217,10 +217,6 @@
         const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(1.2, 32, 32), new THREE.MeshBasicMaterial({ color: 0xffdd00 }));
         scene.add(sunMesh);
 
-        const interiorLight = new THREE.PointLight(0x00ffff, 0, 15);
-        interiorLight.position.set(0, 2, 0); 
-        scene.add(interiorLight);
-
         // --- MATERIALES Y ARQUITECTURA ---
         const mat = {
             ground: new THREE.MeshStandardMaterial({ color: 0x6e8b3d, map: texGrass }),
@@ -277,14 +273,16 @@
         }
 
         const heatGroup = new THREE.Group(); heatGroup.visible = false; scene.add(heatGroup);
-        const hotMat = new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.6 });
-        const coolMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.6 });
+        const hotMat = new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.7 });
+        const coolMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.7 });
         const heatParticles = [];
+        // Partículas exteriores (Calor)
         for(let i=0; i<80; i++) {
             const p = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), hotMat);
             p.position.set((Math.random()-0.5)*14, Math.random()*6, (Math.random()-0.5)*14);
             p.userData.isOutside = true; heatGroup.add(p); heatParticles.push(p);
         }
+        // Partículas interiores (Fresco)
         for(let i=0; i<60; i++) {
             const p = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), coolMat);
             p.position.set((Math.random()-0.5)*9, 0.5 + Math.random()*3, (Math.random()-0.5)*7);
@@ -292,7 +290,7 @@
         }
 
         // =========================================
-        // LÓGICA MATEMÁTICA Y FÍSICA (Color Dinámico)
+        // LÓGICA MATEMÁTICA Y FÍSICA
         // =========================================
         const sunSlider = document.getElementById('sunSlider');
         let isWind = false;
@@ -332,70 +330,46 @@
             sunLight.position.z = 8; 
             sunMesh.position.copy(sunLight.position);
 
-            // Gestionar Iluminación y Colores (Amanecer, Día, Atardecer)
-            if (isTemp) {
-                // Modo Cámara Térmica
-                sunLight.color.setHex(0xff2200); 
-                sunLight.intensity = 1.8;
-                ambientLight.color.setHex(0x0011aa); 
-                ambientLight.intensity = 0.6;
-                sunMesh.material.color.setHex(0xff2200);
+            // MODO REALISTA CON TRANSICIÓN SUAVE (Siempre activo)
+            let rCielo, gCielo, bCielo;
+            let rSol, gSol, bSol;
+            let intensidadSol;
+
+            if (sliderVal <= 0.2) {
+                // Amanecer (0 a 0.2)
+                let mix = sliderVal / 0.2; 
+                rCielo = Math.floor(255 - (255 - 126) * mix);
+                gCielo = Math.floor(100 + (192 - 100) * mix);
+                bCielo = Math.floor(50 + (238 - 50) * mix);
+                rSol = 255;
+                gSol = Math.floor(100 + (240 - 100) * mix);
+                bSol = Math.floor(50 + (220 - 50) * mix);
+                intensidadSol = 0.5 + 0.7 * mix;
+
+            } else if (sliderVal > 0.2 && sliderVal < 0.8) {
+                // Día Pleno (0.2 a 0.8)
+                rCielo = 126; gCielo = 192; bCielo = 238; 
+                rSol = 255; gSol = 250; bSol = 240;
+                intensidadSol = 1.2;
+
             } else {
-                // MODO REALISTA CON TRANSICIÓN SUAVE
-                // Usamos interpolación de color según el valor del slider (0 a 1)
-                
-                let rCielo, gCielo, bCielo;
-                let rSol, gSol, bSol;
-                let intensidadSol;
-
-                if (sliderVal <= 0.2) {
-                    // Amanecer (0 a 0.2)
-                    let mix = sliderVal / 0.2; // Va de 0 a 1 en esta etapa
-                    
-                    // Cielo de naranja oscuro a azul claro
-                    rCielo = Math.floor(255 - (255 - 126) * mix);
-                    gCielo = Math.floor(100 + (192 - 100) * mix);
-                    bCielo = Math.floor(50 + (238 - 50) * mix);
-                    
-                    // Sol de rojo anaranjado a blanco cálido
-                    rSol = 255;
-                    gSol = Math.floor(100 + (240 - 100) * mix);
-                    bSol = Math.floor(50 + (220 - 50) * mix);
-                    
-                    intensidadSol = 0.5 + 0.7 * mix;
-
-                } else if (sliderVal > 0.2 && sliderVal < 0.8) {
-                    // Día Pleno (0.2 a 0.8)
-                    rCielo = 126; gCielo = 192; bCielo = 238; // 0x7ec0ee
-                    rSol = 255; gSol = 250; bSol = 240;
-                    intensidadSol = 1.2;
-
-                } else {
-                    // Atardecer (0.8 a 1.0)
-                    let mix = (sliderVal - 0.8) / 0.2; // Va de 0 a 1 en esta etapa
-                    
-                    // Cielo de azul claro a naranja oscuro/rojizo
-                    rCielo = Math.floor(126 + (255 - 126) * mix);
-                    gCielo = Math.floor(192 - (192 - 100) * mix);
-                    bCielo = Math.floor(238 - (238 - 50) * mix);
-                    
-                    // Sol de blanco cálido a naranja intenso
-                    rSol = 255;
-                    gSol = Math.floor(250 - (250 - 100) * mix);
-                    bSol = Math.floor(240 - (240 - 50) * mix);
-                    
-                    intensidadSol = 1.2 - 0.7 * mix;
-                }
-
-                scene.background.setRGB(rCielo/255, gCielo/255, bCielo/255);
-                sunLight.color.setRGB(rSol/255, gSol/255, bSol/255);
-                sunLight.intensity = intensidadSol;
-                
-                // Darle un ligero tinte al ambiente para que las texturas absorban el color del cielo
-                ambientLight.color.setRGB(rCielo/255, gCielo/255, bCielo/255);
-                
-                sunMesh.material.color.setRGB(rSol/255, gSol/255, bSol/255);
+                // Atardecer (0.8 a 1.0)
+                let mix = (sliderVal - 0.8) / 0.2; 
+                rCielo = Math.floor(126 + (255 - 126) * mix);
+                gCielo = Math.floor(192 - (192 - 100) * mix);
+                bCielo = Math.floor(238 - (238 - 50) * mix);
+                rSol = 255;
+                gSol = Math.floor(250 - (250 - 100) * mix);
+                bSol = Math.floor(240 - (240 - 50) * mix);
+                intensidadSol = 1.2 - 0.7 * mix;
             }
+
+            // Aplicar colores y luces a la escena (sin importar si isTemp está activo o no)
+            scene.background.setRGB(rCielo/255, gCielo/255, bCielo/255);
+            sunLight.color.setRGB(rSol/255, gSol/255, bSol/255);
+            sunLight.intensity = intensidadSol;
+            ambientLight.color.setRGB(rCielo/255, gCielo/255, bCielo/255);
+            sunMesh.material.color.setRGB(rSol/255, gSol/255, bSol/255);
         }
 
         sunSlider.addEventListener('input', updateMathAndPhysics);
@@ -416,23 +390,9 @@
             heatGroup.visible = isTemp;
             this.classList.toggle('active');
             document.getElementById('math-temp').style.display = isTemp ? 'block' : 'none';
-
-            if (isTemp) {
-                mat.wall.color.setHex(0xaaaaaa); 
-                mat.ground.color.setHex(0x222222); 
-                mat.roofFront.color.setHex(0xaaaaaa);
-                mat.grass.color.setHex(0xaaaaaa);
-                mat.floor.color.setHex(0xaaaaaa);
-                scene.background.setHex(0x050510); 
-                interiorLight.intensity = 1.2; 
-            } else {
-                mat.wall.color.setHex(0xfafafa); 
-                mat.ground.color.setHex(0x6e8b3d);
-                mat.roofFront.color.setHex(0x555555);
-                mat.grass.color.setHex(0x4CAF50);
-                mat.floor.color.setHex(0x909090);
-                interiorLight.intensity = 0.0; 
-            }
+            
+            // Ya no cambiamos los colores de los materiales a gris/oscuro. 
+            // Las texturas y la iluminación mantienen su ciclo natural.
             updateMathAndPhysics();
         });
 
