@@ -35,7 +35,7 @@
             left: 15px;
             width: 320px;
             max-width: 85vw;
-            max-height: 80vh; /* Permite hacer scroll si la pantalla es pequeña */
+            max-height: 80vh; 
             overflow-y: auto;
             background: rgba(255, 255, 255, 0.95);
             padding: 15px;
@@ -74,9 +74,7 @@
         .slider-container label { font-size: 0.85rem; font-weight: bold; color: #333; }
         input[type="range"] { width: 100%; height: 30px; margin-bottom: 10px; cursor: pointer; touch-action: none; }
 
-        /* =========================================
-           PANEL DE DATOS MATEMÁTICOS Y FÍSICOS
-           ========================================= */
+        /* PANEL DE DATOS MATEMÁTICOS Y FÍSICOS */
         .math-panel {
             background: #f4f6f8;
             border-left: 4px solid #3498db;
@@ -85,7 +83,7 @@
             border-radius: 4px;
             font-family: 'Courier New', Courier, monospace;
             font-size: 0.8rem;
-            display: none; /* Oculto por defecto */
+            display: none; 
         }
         .math-panel h3 { margin: 0 0 5px 0; font-size: 0.9rem; font-family: 'Segoe UI', sans-serif; color: #2980b9; }
         .equation { font-weight: bold; background: #e2e8f0; padding: 4px; border-radius: 3px; display: inline-block; margin-bottom: 5px; }
@@ -120,7 +118,6 @@
         </div>
 
         <button id="btn-wind" class="action-btn">🌬️ Caudal de Ventilación</button>
-        <!-- Panel Matemático del Viento -->
         <div id="math-wind" class="math-panel">
             <h3>Flujo de Aire (Ventilación Cruzada)</h3>
             <div class="equation">Q = C_d × A × V</div>
@@ -130,8 +127,7 @@
             <div class="result-highlight">Caudal (Q): <span id="val-q">0.00</span> m³/s</div>
         </div>
 
-        <button id="btn-temp" class="action-btn">🌡️ Transmitancia Térmica</button>
-        <!-- Panel Matemático del Calor -->
+        <button id="btn-temp" class="action-btn">🌡️ Mapa de Transferencia de Calor</button>
         <div id="math-temp" class="math-panel">
             <h3>Transferencia de Calor (Muros)</h3>
             <div class="equation">q = U × A × (Text - Tint)</div>
@@ -154,6 +150,43 @@
             toggleBtn.innerText = uiContainer.classList.contains('hidden') ? '☰ Mostrar Controles' : '☰ Ocultar Controles';
         });
 
+        // --- GENERADOR DE TEXTURAS PROCEDURALES ---
+        function createProceduralTexture(type) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+
+            if (type === 'wall') {
+                ctx.fillStyle = '#f4f4f4'; ctx.fillRect(0, 0, 256, 256);
+                for(let i=0; i<8000; i++) { // Estuco
+                    const shade = 230 + Math.random()*25;
+                    ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
+                    ctx.fillRect(Math.random()*256, Math.random()*256, 1, 1);
+                }
+            } else if (type === 'grass') {
+                ctx.fillStyle = '#557a2b'; ctx.fillRect(0, 0, 256, 256);
+                for(let i=0; i<8000; i++) { // Pasto
+                    const g = 100 + Math.random()*50;
+                    ctx.fillStyle = `rgb(50,${g},30)`;
+                    ctx.fillRect(Math.random()*256, Math.random()*256, 2, 2);
+                }
+            } else if (type === 'floor') {
+                ctx.fillStyle = '#888888'; ctx.fillRect(0, 0, 256, 256);
+                for(let i=0; i<5000; i++) { // Concreto
+                    const shade = 100 + Math.random()*50;
+                    ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
+                    ctx.fillRect(Math.random()*256, Math.random()*256, 2, 2);
+                }
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        }
+
+        const texWall = createProceduralTexture('wall');
+        const texGrass = createProceduralTexture('grass');
+        const texFloor = createProceduralTexture('floor');
+
         // --- 1. ESCENA 3D BÁSICA ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x7ec0ee);
@@ -170,32 +203,35 @@
         controls.dampingFactor = 0.05;
         controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
-        // --- ILUMINACIÓN ---
+        // --- ILUMINACIÓN NORMAL Y TÉRMICA ---
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
+        
         const sunLight = new THREE.DirectionalLight(0xfff5b6, 1.2);
         sunLight.castShadow = true;
-        sunLight.shadow.mapSize.width = 2048;
-        sunLight.shadow.mapSize.height = 2048;
-        sunLight.shadow.camera.near = 0.5;
-        sunLight.shadow.camera.far = 50;
-        sunLight.shadow.camera.left = -15;
-        sunLight.shadow.camera.right = 15;
-        sunLight.shadow.camera.top = 15;
-        sunLight.shadow.camera.bottom = -15;
+        sunLight.shadow.mapSize.width = 2048; sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5; sunLight.shadow.camera.far = 50;
+        sunLight.shadow.camera.left = -15; sunLight.shadow.camera.right = 15;
+        sunLight.shadow.camera.top = 15; sunLight.shadow.camera.bottom = -15;
         scene.add(sunLight);
+        
         const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(1.2, 32, 32), new THREE.MeshBasicMaterial({ color: 0xffdd00 }));
         scene.add(sunMesh);
 
+        // Luz Azul interior (Solo visible en mapa térmico)
+        const interiorLight = new THREE.PointLight(0x00ffff, 0, 15);
+        interiorLight.position.set(0, 2, 0); 
+        scene.add(interiorLight);
+
         // --- MATERIALES Y ARQUITECTURA ---
         const mat = {
-            ground: new THREE.MeshStandardMaterial({ color: 0x6e8b3d }),
-            floor: new THREE.MeshStandardMaterial({ color: 0x909090 }),
-            wall: new THREE.MeshStandardMaterial({ color: 0xfafafa }), 
+            ground: new THREE.MeshStandardMaterial({ color: 0x6e8b3d, map: texGrass }),
+            floor: new THREE.MeshStandardMaterial({ color: 0x909090, map: texFloor }),
+            wall: new THREE.MeshStandardMaterial({ color: 0xfafafa, map: texWall }), 
             frame: new THREE.MeshStandardMaterial({ color: 0x222222 }),
             glass: new THREE.MeshPhysicalMaterial({ color: 0xadd8e6, transmission: 0.8, transparent: true, opacity: 0.4 }),
-            roofFront: new THREE.MeshStandardMaterial({ color: 0x555555 }),
-            grass: new THREE.MeshStandardMaterial({ color: 0x4CAF50 })
+            roofFront: new THREE.MeshStandardMaterial({ color: 0x555555, map: texFloor }),
+            grass: new THREE.MeshStandardMaterial({ color: 0x4CAF50, map: texGrass })
         };
 
         const houseGroup = new THREE.Group();
@@ -212,20 +248,20 @@
         }
 
         // Muros y Ventanas
-        createBox(10.6, 4, 0.4, 0, 2.4, -4.3, mat.wall); // Atrás
-        createBox(0.4, 1, 9, -5.3, 0.9, 0, mat.wall); // Izq abajo
-        createBox(0.4, 1.5, 9, -5.3, 3.65, 0, mat.wall); // Izq arriba
+        createBox(10.6, 4, 0.4, 0, 2.4, -4.3, mat.wall); 
+        createBox(0.4, 1, 9, -5.3, 0.9, 0, mat.wall); 
+        createBox(0.4, 1.5, 9, -5.3, 3.65, 0, mat.wall); 
         createBox(0.4, 1.5, 3, -5.3, 2.15, 3, mat.wall); 
         createBox(0.4, 1.5, 3, -5.3, 2.15, -3, mat.wall);
-        createBox(0.45, 1.6, 3.2, -5.3, 2.15, 0, mat.frame); // Marco Izq
-        createBox(0.35, 1.4, 3.0, -5.3, 2.15, 0, mat.glass, false); // Cristal Izq
+        createBox(0.45, 1.6, 3.2, -5.3, 2.15, 0, mat.frame); 
+        createBox(0.35, 1.4, 3.0, -5.3, 2.15, 0, mat.glass, false); 
 
-        createBox(0.4, 2.5, 9, 5.3, 1.65, 0, mat.wall); // Der abajo
-        createBox(0.4, 0.5, 9, 5.3, 4.15, 0, mat.wall); // Der arriba
+        createBox(0.4, 2.5, 9, 5.3, 1.65, 0, mat.wall); 
+        createBox(0.4, 0.5, 9, 5.3, 4.15, 0, mat.wall); 
         createBox(0.4, 1, 3, 5.3, 3.4, 3, mat.wall); 
         createBox(0.4, 1, 3, 5.3, 3.4, -3, mat.wall);
-        createBox(0.45, 1.1, 3.2, 5.3, 3.4, 0, mat.frame); // Marco Der
-        createBox(0.35, 0.9, 3.0, 5.3, 3.4, 0, mat.glass, false); // Cristal Der
+        createBox(0.45, 1.1, 3.2, 5.3, 3.4, 0, mat.frame); 
+        createBox(0.35, 0.9, 3.0, 5.3, 3.4, 0, mat.glass, false); 
 
         // Techo
         createBox(13, 0.3, 11, 0, 4.55, 0, mat.roofFront);
@@ -258,64 +294,61 @@
         }
 
         // =========================================
-        // LÓGICA MATEMÁTICA Y FÍSICA (NUEVO)
+        // LÓGICA MATEMÁTICA Y FÍSICA
         // =========================================
         const sunSlider = document.getElementById('sunSlider');
         let isWind = false;
         let isTemp = false;
 
         function updateMathAndPhysics() {
-            // 1. Calcular Hora del día (0 a 100 mapeado a 06:00 - 18:00)
-            const sliderVal = sunSlider.value / 100; // 0 a 1
+            const sliderVal = sunSlider.value / 100; 
             const hourDecimal = 6 + (sliderVal * 12);
             const hours = Math.floor(hourDecimal);
             const minutes = Math.floor((hourDecimal - hours) * 60);
-            document.getElementById('time-display').innerText = 
-                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            document.getElementById('time-display').innerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
-            // 2. Curva de Temperatura Exterior (Pico a las 13:00 / 1 PM en Santa Marta)
-            // Usamos una función Seno: Base 25°C, sube hasta 34°C al mediodía/tarde
             const Text = 25 + 9 * Math.sin(Math.PI * (hourDecimal - 6) / 10); 
-            
-            // 3. Temperatura Interior (Amortiguada por el diseño bioclimático)
-            // Si el análisis de temperatura está activo, mostramos cómo la casa frena el calor
             const Tint = isTemp ? (26 + 2 * Math.sin(Math.PI * (hourDecimal - 6) / 12)) : Text;
 
-            // Cálculos Ecuación de Calor: q = U * A * (Text - Tint)
-            const U = 0.75; // Transmitancia W/m2K
-            const A_muros = 64.0; // m2
+            const U = 0.75; 
+            const A_muros = 64.0; 
             let q_calor = U * A_muros * (Text - Tint);
-            if(q_calor < 0) q_calor = 0; // Evitar negativos en la demo visual
+            if(q_calor < 0) q_calor = 0; 
 
             document.getElementById('val-text').innerText = Text.toFixed(2) + " °C";
             document.getElementById('val-tint').innerText = Tint.toFixed(2) + " °C";
             document.getElementById('val-heat').innerText = q_calor.toFixed(2);
 
-            // 4. Curva de Viento (Brisa fuerte en la tarde)
-            // Velocidad del viento varía de 0.5 m/s en la mañana a 4.5 m/s en la tarde
             const V_viento = 0.5 + 4.0 * Math.sin(Math.PI * (hourDecimal - 6) / 12);
-            
-            // Cálculos Ecuación Caudal: Q = Cd * A * V
             const Cd = 0.65;
-            const A_ventana = 1.80; // m2
+            const A_ventana = 1.80; 
             const Q_caudal = Cd * A_ventana * V_viento;
 
             document.getElementById('val-v').innerText = V_viento.toFixed(2) + " m/s";
             document.getElementById('val-q').innerText = Q_caudal.toFixed(2);
 
-            // 5. Actualizar la posición visual del Sol
             const angle = Math.PI * sliderVal; 
             sunLight.position.x = Math.cos(angle) * 20;
             sunLight.position.y = Math.sin(angle) * 18;
             sunLight.position.z = 8; 
             sunMesh.position.copy(sunLight.position);
 
-            // Colores del cielo según hora
-            if (!isTemp) {
+            // Gestionar Iluminación y Colores según el modo Térmico
+            if (isTemp) {
+                // Modo Cámara Infrarroja (Térmica)
+                sunLight.color.setHex(0xff2200); // Radiación solar intensa (Roja)
+                sunLight.intensity = 1.8;
+                ambientLight.color.setHex(0x0011aa); // Sombras frías (Azules)
+                ambientLight.intensity = 0.6;
+                sunMesh.material.color.setHex(0xff2200);
+            } else {
+                // Modo Realista
                 if (sliderVal < 0.2 || sliderVal > 0.8) {
                     scene.background.setHex(0xffaa66); sunLight.color.setHex(0xffaa66); sunLight.intensity = 0.7;
+                    sunMesh.material.color.setHex(0xffaa66);
                 } else {
                     scene.background.setHex(0x7ec0ee); sunLight.color.setHex(0xffffff); sunLight.intensity = 1.3;
+                    sunMesh.material.color.setHex(0xffdd00);
                 }
             }
         }
@@ -329,8 +362,6 @@
             windGroup.visible = isWind;
             this.classList.toggle('active');
             mat.glass.opacity = isWind ? 0.1 : 0.4; 
-            
-            // Mostrar/Ocultar el panel de matemáticas
             document.getElementById('math-wind').style.display = isWind ? 'block' : 'none';
             updateMathAndPhysics();
         });
@@ -339,23 +370,31 @@
             isTemp = !isTemp;
             heatGroup.visible = isTemp;
             this.classList.toggle('active');
-            
-            // Mostrar/Ocultar el panel de matemáticas
             document.getElementById('math-temp').style.display = isTemp ? 'block' : 'none';
 
             if (isTemp) {
-                mat.wall.color.setHex(0xff4422); 
-                mat.ground.color.setHex(0x553311);
-                scene.background.setHex(0x3a1005); 
-                sunLight.intensity = 0.5;
+                // Preparar los materiales para recibir el mapa de calor (Gris neutro)
+                mat.wall.color.setHex(0xaaaaaa); 
+                mat.ground.color.setHex(0x222222); // Suelo oscuro para no distraer
+                mat.roofFront.color.setHex(0xaaaaaa);
+                mat.grass.color.setHex(0xaaaaaa);
+                mat.floor.color.setHex(0xaaaaaa);
+                
+                scene.background.setHex(0x050510); // Cielo nocturno/infrarrojo
+                interiorLight.intensity = 1.2; // Encender frescor interior
             } else {
+                // Restaurar colores originales
                 mat.wall.color.setHex(0xfafafa); 
                 mat.ground.color.setHex(0x6e8b3d);
+                mat.roofFront.color.setHex(0x555555);
+                mat.grass.color.setHex(0x4CAF50);
+                mat.floor.color.setHex(0x909090);
+
+                interiorLight.intensity = 0.0; // Apagar frescor interior
             }
             updateMathAndPhysics();
         });
 
-        // Ejecutar cálculo inicial
         updateMathAndPhysics();
 
         // --- BUCLE DE ANIMACIÓN ---
@@ -364,13 +403,11 @@
             const time = Date.now() * 0.002;
 
             if (isWind) {
-                // Hacer que la velocidad de las partículas dependa de V_viento calculada!
                 const sliderVal = sunSlider.value / 100;
                 const hourDecimal = 6 + (sliderVal * 12);
                 const V_viento = 0.5 + 4.0 * Math.sin(Math.PI * (hourDecimal - 6) / 12);
                 
                 winds.forEach(p => {
-                    // La velocidad gráfica se ajusta a la matemática
                     p.position.x += (p.userData.speedX * (V_viento / 2)); 
                     if (p.position.x > -4.5 && p.position.x < 4.5) p.position.y += 0.015; 
                     p.position.z += Math.sin(time * 2 + p.userData.offsetY) * 0.01;
