@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Modelo Bioclimático 3D</title>
+    <title>Modelo Bioclimático 3D con Cálculos</title>
     <style>
         body {
             margin: 0;
@@ -12,7 +12,6 @@
             background-color: #111;
         }
 
-        /* Botón para desplegar/ocultar el menú */
         #toggle-menu {
             position: absolute;
             top: 15px;
@@ -28,47 +27,38 @@
             z-index: 1000;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             -webkit-tap-highlight-color: transparent;
-            transition: background 0.3s ease;
         }
 
-        #toggle-menu:hover {
-            background: #f0f0f0;
-        }
-
-        /* Interfaz de Usuario (Panel) */
         #ui-container {
             position: absolute;
-            top: 70px; /* Debajo del botón toggle */
+            top: 70px; 
             left: 15px;
-            width: 300px;
+            width: 320px;
             max-width: 85vw;
+            max-height: 80vh; /* Permite hacer scroll si la pantalla es pequeña */
+            overflow-y: auto;
             background: rgba(255, 255, 255, 0.95);
             padding: 15px;
             border-radius: 12px;
             box-shadow: 0 8px 25px rgba(0,0,0,0.4);
             z-index: 999;
             pointer-events: auto;
-            /* Transición para el efecto de deslizar */
             transform: translateX(0);
-            transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1), opacity 0.3s ease;
-            opacity: 1;
+            transition: transform 0.3s ease, opacity 0.3s ease;
         }
 
-        /* Clase para ocultar el panel desplazándolo hacia la izquierda */
         #ui-container.hidden {
             transform: translateX(-150%);
             opacity: 0;
             pointer-events: none;
         }
 
-        h2 { margin: 0 0 10px 0; font-size: 1.1rem; color: #222; }
-        p { font-size: 0.8rem; color: #555; margin-bottom: 15px; line-height: 1.3; }
-
-        .control-group { margin-bottom: 12px; }
+        h2 { margin: 0 0 5px 0; font-size: 1.1rem; color: #222; }
+        p.subtitle { font-size: 0.75rem; color: #555; margin-bottom: 15px; }
 
         button.action-btn {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             margin-bottom: 8px;
             border: 2px solid #2c3e50;
             border-radius: 8px;
@@ -77,40 +67,35 @@
             font-weight: 700;
             font-size: 0.9rem;
             cursor: pointer;
-            transition: all 0.2s ease;
             -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
         }
+        button.action-btn.active { background: #2c3e50; color: white; }
 
-        button.action-btn.active {
-            background: #2c3e50;
-            color: white;
-        }
-
-        .slider-container { display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px; }
         .slider-container label { font-size: 0.85rem; font-weight: bold; color: #333; }
-        input[type="range"] { 
-            width: 100%; 
-            height: 30px; 
-            cursor: pointer; 
-            touch-action: none; 
+        input[type="range"] { width: 100%; height: 30px; margin-bottom: 10px; cursor: pointer; touch-action: none; }
+
+        /* =========================================
+           PANEL DE DATOS MATEMÁTICOS Y FÍSICOS
+           ========================================= */
+        .math-panel {
+            background: #f4f6f8;
+            border-left: 4px solid #3498db;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.8rem;
+            display: none; /* Oculto por defecto */
         }
+        .math-panel h3 { margin: 0 0 5px 0; font-size: 0.9rem; font-family: 'Segoe UI', sans-serif; color: #2980b9; }
+        .equation { font-weight: bold; background: #e2e8f0; padding: 4px; border-radius: 3px; display: inline-block; margin-bottom: 5px; }
+        .var-row { display: flex; justify-content: space-between; margin-bottom: 3px; border-bottom: 1px dashed #ccc; }
+        .result-highlight { color: #d35400; font-weight: bold; font-size: 0.9rem; margin-top: 5px; text-align: right; }
 
         #instructions {
-            position: absolute;
-            bottom: 15px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            pointer-events: none;
-            text-align: center;
-            width: max-content;
-            z-index: 10;
-            backdrop-filter: blur(4px);
+            position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.7); color: white; padding: 8px 16px; border-radius: 20px;
+            font-size: 0.75rem; pointer-events: none; text-align: center; width: max-content; z-index: 10;
         }
 
         @media (max-width: 600px) {
@@ -123,63 +108,71 @@
 </head>
 <body>
 
-    <!-- Botón para Mostrar/Ocultar Menú -->
     <button id="toggle-menu">☰ Controles</button>
 
     <div id="ui-container">
         <h2>Simulación Bioclimática</h2>
-        <p>Ajusta las variables para analizar el comportamiento pasivo del proyecto.</p>
+        <p class="subtitle">Datos Físicos en Tiempo Real</p>
 
         <div class="slider-container">
-            <label for="sunSlider">☀️ Trayectoria Solar (Hora)</label>
-            <input type="range" id="sunSlider" min="0" max="100" value="30">
+            <label for="sunSlider">☀️ Hora del día: <span id="time-display">06:00</span></label>
+            <input type="range" id="sunSlider" min="0" max="100" value="0">
         </div>
 
-        <div class="control-group">
-            <button id="btn-wind" class="action-btn">🌬️ Activar Flujo de Aire</button>
-            <button id="btn-temp" class="action-btn">🌡️ Analizar Temperatura</button>
+        <button id="btn-wind" class="action-btn">🌬️ Caudal de Ventilación</button>
+        <!-- Panel Matemático del Viento -->
+        <div id="math-wind" class="math-panel">
+            <h3>Flujo de Aire (Ventilación Cruzada)</h3>
+            <div class="equation">Q = C_d × A × V</div>
+            <div class="var-row"><span>C_d (Coef. Descarga):</span> <span>0.65</span></div>
+            <div class="var-row"><span>A (Área Ventana):</span> <span>1.80 m²</span></div>
+            <div class="var-row"><span>V (Velocidad Viento):</span> <span id="val-v">0.00 m/s</span></div>
+            <div class="result-highlight">Caudal (Q): <span id="val-q">0.00</span> m³/s</div>
+        </div>
+
+        <button id="btn-temp" class="action-btn">🌡️ Transmitancia Térmica</button>
+        <!-- Panel Matemático del Calor -->
+        <div id="math-temp" class="math-panel">
+            <h3>Transferencia de Calor (Muros)</h3>
+            <div class="equation">q = U × A × (Text - Tint)</div>
+            <div class="var-row"><span>U (Transmitancia):</span> <span>0.75 W/m²K</span></div>
+            <div class="var-row"><span>A (Área Envolvente):</span> <span>64.00 m²</span></div>
+            <div class="var-row"><span>Text (Temp. Exterior):</span> <span id="val-text">0.00 °C</span></div>
+            <div class="var-row"><span>Tint (Temp. Interior):</span> <span id="val-tint">0.00 °C</span></div>
+            <div class="result-highlight">Calor Entrante (q): <span id="val-heat">0.00</span> W</div>
         </div>
     </div>
 
     <div id="instructions">👆 1 dedo: Orbitar | ✌️ 2 dedos: Zoom</div>
 
     <script>
-        // --- LÓGICA DEL MENÚ DESPLEGABLE ---
+        // --- UI TOGGLE ---
         const toggleBtn = document.getElementById('toggle-menu');
         const uiContainer = document.getElementById('ui-container');
-
         toggleBtn.addEventListener('click', () => {
             uiContainer.classList.toggle('hidden');
-            if (uiContainer.classList.contains('hidden')) {
-                toggleBtn.innerText = '☰ Mostrar Controles';
-            } else {
-                toggleBtn.innerText = '☰ Ocultar Controles';
-            }
+            toggleBtn.innerText = uiContainer.classList.contains('hidden') ? '☰ Mostrar Controles' : '☰ Ocultar Controles';
         });
 
-        // --- 1. ESCENA Y CÁMARA ---
+        // --- 1. ESCENA 3D BÁSICA ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x7ec0ee); 
-
+        scene.background = new THREE.Color(0x7ec0ee);
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(16, 12, 20);
-
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.domElement.style.touchAction = 'none';
         document.body.appendChild(renderer.domElement);
-
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.maxPolarAngle = Math.PI / 2 - 0.05; 
+        controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
-        // --- 2. ILUMINACIÓN ---
+        // --- ILUMINACIÓN ---
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
-
         const sunLight = new THREE.DirectionalLight(0xfff5b6, 1.2);
         sunLight.castShadow = true;
         sunLight.shadow.mapSize.width = 2048;
@@ -191,178 +184,165 @@
         sunLight.shadow.camera.top = 15;
         sunLight.shadow.camera.bottom = -15;
         scene.add(sunLight);
-
-        const sunGeo = new THREE.SphereGeometry(1.2, 32, 32);
-        const sunMat = new THREE.MeshBasicMaterial({ color: 0xffdd00 });
-        const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+        const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(1.2, 32, 32), new THREE.MeshBasicMaterial({ color: 0xffdd00 }));
         scene.add(sunMesh);
 
-        // --- 3. MATERIALES ---
+        // --- MATERIALES Y ARQUITECTURA ---
         const mat = {
-            ground: new THREE.MeshStandardMaterial({ color: 0x6e8b3d, roughness: 1 }),
-            floor: new THREE.MeshStandardMaterial({ color: 0x909090, roughness: 0.9 }),
-            wall: new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.8 }), 
-            frame: new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3, metalness: 0.6 }), // Aluminio oscuro
-            glass: new THREE.MeshPhysicalMaterial({  // Material de cristal realista
-                color: 0xadd8e6,
-                metalness: 0.1,
-                roughness: 0.1,
-                transmission: 0.8, // Transparencia tipo cristal (necesita iluminación)
-                transparent: true,
-                opacity: 0.4
-            }),
+            ground: new THREE.MeshStandardMaterial({ color: 0x6e8b3d }),
+            floor: new THREE.MeshStandardMaterial({ color: 0x909090 }),
+            wall: new THREE.MeshStandardMaterial({ color: 0xfafafa }), 
+            frame: new THREE.MeshStandardMaterial({ color: 0x222222 }),
+            glass: new THREE.MeshPhysicalMaterial({ color: 0xadd8e6, transmission: 0.8, transparent: true, opacity: 0.4 }),
             roofFront: new THREE.MeshStandardMaterial({ color: 0x555555 }),
-            grass: new THREE.MeshStandardMaterial({ color: 0x4CAF50, roughness: 0.8 })
+            grass: new THREE.MeshStandardMaterial({ color: 0x4CAF50 })
         };
 
         const houseGroup = new THREE.Group();
         scene.add(houseGroup);
 
-        // Suelo y Base
         const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), mat.ground);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        scene.add(ground);
-
+        ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
         const base = new THREE.Mesh(new THREE.BoxGeometry(11, 0.4, 9), mat.floor);
-        base.position.y = 0.2;
-        base.receiveShadow = true;
-        base.castShadow = true;
-        houseGroup.add(base);
+        base.position.y = 0.2; base.receiveShadow = true; base.castShadow = true; houseGroup.add(base);
 
         function createBox(w, h, d, x, y, z, material, castShadow = true) {
             const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
-            mesh.position.set(x, y, z);
-            mesh.castShadow = castShadow;
-            mesh.receiveShadow = true;
-            houseGroup.add(mesh);
-            return mesh;
+            mesh.position.set(x, y, z); mesh.castShadow = castShadow; mesh.receiveShadow = true; houseGroup.add(mesh);
         }
 
-        // MUROS Y VENTANAS MEJORADAS
-        // Muro Trasero
-        createBox(10.6, 4, 0.4, 0, 2.4, -4.3, mat.wall);
-        
-        // Muro Izquierdo (Entrada)
-        createBox(0.4, 1, 9, -5.3, 0.9, 0, mat.wall); // Antepecho
-        createBox(0.4, 1.5, 9, -5.3, 3.65, 0, mat.wall); // Dintel superior
-        createBox(0.4, 1.5, 3, -5.3, 2.15, 3, mat.wall); // Lado frontal
-        createBox(0.4, 1.5, 3, -5.3, 2.15, -3, mat.wall); // Lado trasero
-        
-        // Marco y Cristal Ventana Izquierda
-        createBox(0.45, 1.6, 3.2, -5.3, 2.15, 0, mat.frame); // Marco principal
-        createBox(0.5, 1.5, 0.1, -5.3, 2.15, 0, mat.frame);  // Parteluz (división central)
-        createBox(0.35, 1.4, 3.0, -5.3, 2.15, 0, mat.glass, false); // Cristal
+        // Muros y Ventanas
+        createBox(10.6, 4, 0.4, 0, 2.4, -4.3, mat.wall); // Atrás
+        createBox(0.4, 1, 9, -5.3, 0.9, 0, mat.wall); // Izq abajo
+        createBox(0.4, 1.5, 9, -5.3, 3.65, 0, mat.wall); // Izq arriba
+        createBox(0.4, 1.5, 3, -5.3, 2.15, 3, mat.wall); 
+        createBox(0.4, 1.5, 3, -5.3, 2.15, -3, mat.wall);
+        createBox(0.45, 1.6, 3.2, -5.3, 2.15, 0, mat.frame); // Marco Izq
+        createBox(0.35, 1.4, 3.0, -5.3, 2.15, 0, mat.glass, false); // Cristal Izq
 
-        // Muro Derecho (Salida térmica)
-        createBox(0.4, 2.5, 9, 5.3, 1.65, 0, mat.wall); // Antepecho más alto
-        createBox(0.4, 0.5, 9, 5.3, 4.15, 0, mat.wall); // Dintel superior
-        createBox(0.4, 1, 3, 5.3, 3.4, 3, mat.wall); // Lado frontal
-        createBox(0.4, 1, 3, 5.3, 3.4, -3, mat.wall); // Lado trasero
-        
-        // Marco y Cristal Ventana Derecha
-        createBox(0.45, 1.1, 3.2, 5.3, 3.4, 0, mat.frame); // Marco
-        createBox(0.5, 1.0, 0.1, 5.3, 3.4, 0, mat.frame);  // Parteluz
-        createBox(0.35, 0.9, 3.0, 5.3, 3.4, 0, mat.glass, false); // Cristal
+        createBox(0.4, 2.5, 9, 5.3, 1.65, 0, mat.wall); // Der abajo
+        createBox(0.4, 0.5, 9, 5.3, 4.15, 0, mat.wall); // Der arriba
+        createBox(0.4, 1, 3, 5.3, 3.4, 3, mat.wall); 
+        createBox(0.4, 1, 3, 5.3, 3.4, -3, mat.wall);
+        createBox(0.45, 1.1, 3.2, 5.3, 3.4, 0, mat.frame); // Marco Der
+        createBox(0.35, 0.9, 3.0, 5.3, 3.4, 0, mat.glass, false); // Cristal Der
 
-        // Cubierta y Vegetación
+        // Techo
         createBox(13, 0.3, 11, 0, 4.55, 0, mat.roofFront);
         createBox(12.6, 0.2, 10.6, 0, 4.8, 0, mat.grass);
 
-        for(let i = 0; i < 60; i++) {
-            const isCone = Math.random() > 0.5;
-            const geo = isCone ? new THREE.ConeGeometry(0.2, 0.5, 5) : new THREE.SphereGeometry(0.25, 5, 5);
-            const plant = new THREE.Mesh(geo, mat.grass);
-            plant.position.set((Math.random() - 0.5) * 11, 5.0, (Math.random() - 0.5) * 9);
-            plant.castShadow = true;
-            houseGroup.add(plant);
-        }
-
-        // --- 4. SISTEMAS FÍSICOS (Viento y Calor) ---
-        const windGroup = new THREE.Group();
-        windGroup.visible = false;
-        scene.add(windGroup);
-        const windGeo = new THREE.SphereGeometry(0.12, 8, 8);
+        // --- SISTEMAS DE PARTÍCULAS ---
+        const windGroup = new THREE.Group(); windGroup.visible = false; scene.add(windGroup);
         const windMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.7 });
         const winds = [];
-        for(let i = 0; i < 120; i++) {
-            const p = new THREE.Mesh(windGeo, windMat);
-            resetWind(p);
-            p.position.x = (Math.random() - 0.5) * 15;
-            windGroup.add(p);
-            winds.push(p);
-        }
-        function resetWind(p) {
-            p.position.set(-8 - Math.random() * 2, 1.2 + Math.random() * 1.5, (Math.random() - 0.5) * 2);
-            p.userData.speedX = 0.08 + Math.random() * 0.04;
-            p.userData.offsetY = Math.random() * Math.PI * 2;
+        for(let i=0; i<120; i++) {
+            const p = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), windMat);
+            p.position.set(-8 - Math.random()*2, 1.2 + Math.random()*1.5, (Math.random()-0.5)*2);
+            p.userData = { speedX: 0.08 + Math.random()*0.04, offsetY: Math.random()*Math.PI*2 };
+            windGroup.add(p); winds.push(p);
         }
 
-        const heatGroup = new THREE.Group();
-        heatGroup.visible = false;
-        scene.add(heatGroup);
-        const hotGeo = new THREE.SphereGeometry(0.15, 6, 6);
+        const heatGroup = new THREE.Group(); heatGroup.visible = false; scene.add(heatGroup);
         const hotMat = new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.6 });
         const coolMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.6 });
         const heatParticles = [];
-        
-        for(let i = 0; i < 80; i++) {
-            const p = new THREE.Mesh(hotGeo, hotMat);
-            p.position.set((Math.random() - 0.5) * 14, Math.random() * 6, (Math.random() - 0.5) * 14);
-            p.userData.isOutside = true;
-            heatGroup.add(p);
-            heatParticles.push(p);
+        for(let i=0; i<80; i++) {
+            const p = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), hotMat);
+            p.position.set((Math.random()-0.5)*14, Math.random()*6, (Math.random()-0.5)*14);
+            p.userData.isOutside = true; heatGroup.add(p); heatParticles.push(p);
         }
-        for(let i = 0; i < 60; i++) {
-            const p = new THREE.Mesh(hotGeo, coolMat);
-            p.position.set((Math.random() - 0.5) * 9, 0.5 + Math.random() * 3, (Math.random() - 0.5) * 7);
-            p.userData.isOutside = false;
-            heatGroup.add(p);
-            heatParticles.push(p);
+        for(let i=0; i<60; i++) {
+            const p = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), coolMat);
+            p.position.set((Math.random()-0.5)*9, 0.5 + Math.random()*3, (Math.random()-0.5)*7);
+            p.userData.isOutside = false; heatGroup.add(p); heatParticles.push(p);
         }
 
-        // --- 5. INTERACCIONES UI ---
+        // =========================================
+        // LÓGICA MATEMÁTICA Y FÍSICA (NUEVO)
+        // =========================================
         const sunSlider = document.getElementById('sunSlider');
-        function updateSun() {
-            const time = sunSlider.value / 100; 
-            const angle = Math.PI * time; 
+        let isWind = false;
+        let isTemp = false;
+
+        function updateMathAndPhysics() {
+            // 1. Calcular Hora del día (0 a 100 mapeado a 06:00 - 18:00)
+            const sliderVal = sunSlider.value / 100; // 0 a 1
+            const hourDecimal = 6 + (sliderVal * 12);
+            const hours = Math.floor(hourDecimal);
+            const minutes = Math.floor((hourDecimal - hours) * 60);
+            document.getElementById('time-display').innerText = 
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+            // 2. Curva de Temperatura Exterior (Pico a las 13:00 / 1 PM en Santa Marta)
+            // Usamos una función Seno: Base 25°C, sube hasta 34°C al mediodía/tarde
+            const Text = 25 + 9 * Math.sin(Math.PI * (hourDecimal - 6) / 10); 
+            
+            // 3. Temperatura Interior (Amortiguada por el diseño bioclimático)
+            // Si el análisis de temperatura está activo, mostramos cómo la casa frena el calor
+            const Tint = isTemp ? (26 + 2 * Math.sin(Math.PI * (hourDecimal - 6) / 12)) : Text;
+
+            // Cálculos Ecuación de Calor: q = U * A * (Text - Tint)
+            const U = 0.75; // Transmitancia W/m2K
+            const A_muros = 64.0; // m2
+            let q_calor = U * A_muros * (Text - Tint);
+            if(q_calor < 0) q_calor = 0; // Evitar negativos en la demo visual
+
+            document.getElementById('val-text').innerText = Text.toFixed(2) + " °C";
+            document.getElementById('val-tint').innerText = Tint.toFixed(2) + " °C";
+            document.getElementById('val-heat').innerText = q_calor.toFixed(2);
+
+            // 4. Curva de Viento (Brisa fuerte en la tarde)
+            // Velocidad del viento varía de 0.5 m/s en la mañana a 4.5 m/s en la tarde
+            const V_viento = 0.5 + 4.0 * Math.sin(Math.PI * (hourDecimal - 6) / 12);
+            
+            // Cálculos Ecuación Caudal: Q = Cd * A * V
+            const Cd = 0.65;
+            const A_ventana = 1.80; // m2
+            const Q_caudal = Cd * A_ventana * V_viento;
+
+            document.getElementById('val-v').innerText = V_viento.toFixed(2) + " m/s";
+            document.getElementById('val-q').innerText = Q_caudal.toFixed(2);
+
+            // 5. Actualizar la posición visual del Sol
+            const angle = Math.PI * sliderVal; 
             sunLight.position.x = Math.cos(angle) * 20;
             sunLight.position.y = Math.sin(angle) * 18;
             sunLight.position.z = 8; 
             sunMesh.position.copy(sunLight.position);
 
-            if (!document.getElementById('btn-temp').classList.contains('active')) {
-                if (time < 0.2 || time > 0.8) {
-                    scene.background.setHex(0xffaa66);
-                    sunLight.color.setHex(0xffaa66);
-                    sunLight.intensity = 0.7;
+            // Colores del cielo según hora
+            if (!isTemp) {
+                if (sliderVal < 0.2 || sliderVal > 0.8) {
+                    scene.background.setHex(0xffaa66); sunLight.color.setHex(0xffaa66); sunLight.intensity = 0.7;
                 } else {
-                    scene.background.setHex(0x7ec0ee);
-                    sunLight.color.setHex(0xffffff);
-                    sunLight.intensity = 1.3;
+                    scene.background.setHex(0x7ec0ee); sunLight.color.setHex(0xffffff); sunLight.intensity = 1.3;
                 }
             }
         }
-        sunSlider.addEventListener('input', updateSun);
-        sunSlider.addEventListener('change', updateSun);
-        updateSun();
 
-        let isWind = false;
+        sunSlider.addEventListener('input', updateMathAndPhysics);
+        sunSlider.addEventListener('change', updateMathAndPhysics);
+
+        // Eventos de los Botones
         document.getElementById('btn-wind').addEventListener('click', function() {
             isWind = !isWind;
             windGroup.visible = isWind;
             this.classList.toggle('active');
-            
-            // Efecto visual: abrir las ventanas (hacer desaparecer los cristales momentáneamente)
             mat.glass.opacity = isWind ? 0.1 : 0.4; 
+            
+            // Mostrar/Ocultar el panel de matemáticas
+            document.getElementById('math-wind').style.display = isWind ? 'block' : 'none';
+            updateMathAndPhysics();
         });
 
-        let isTemp = false;
         document.getElementById('btn-temp').addEventListener('click', function() {
             isTemp = !isTemp;
             heatGroup.visible = isTemp;
             this.classList.toggle('active');
             
+            // Mostrar/Ocultar el panel de matemáticas
+            document.getElementById('math-temp').style.display = isTemp ? 'block' : 'none';
+
             if (isTemp) {
                 mat.wall.color.setHex(0xff4422); 
                 mat.ground.color.setHex(0x553311);
@@ -371,29 +351,39 @@
             } else {
                 mat.wall.color.setHex(0xfafafa); 
                 mat.ground.color.setHex(0x6e8b3d);
-                updateSun(); 
             }
+            updateMathAndPhysics();
         });
 
-        // --- 6. ANIMACIÓN ---
+        // Ejecutar cálculo inicial
+        updateMathAndPhysics();
+
+        // --- BUCLE DE ANIMACIÓN ---
         function animate() {
             requestAnimationFrame(animate);
             const time = Date.now() * 0.002;
 
             if (isWind) {
+                // Hacer que la velocidad de las partículas dependa de V_viento calculada!
+                const sliderVal = sunSlider.value / 100;
+                const hourDecimal = 6 + (sliderVal * 12);
+                const V_viento = 0.5 + 4.0 * Math.sin(Math.PI * (hourDecimal - 6) / 12);
+                
                 winds.forEach(p => {
-                    p.position.x += p.userData.speedX;
+                    // La velocidad gráfica se ajusta a la matemática
+                    p.position.x += (p.userData.speedX * (V_viento / 2)); 
                     if (p.position.x > -4.5 && p.position.x < 4.5) p.position.y += 0.015; 
                     p.position.z += Math.sin(time * 2 + p.userData.offsetY) * 0.01;
-                    if (p.position.x > 9) resetWind(p);
+                    if (p.position.x > 9) {
+                        p.position.set(-8 - Math.random()*2, 1.2 + Math.random()*1.5, (Math.random()-0.5)*2);
+                    }
                 });
             }
 
             if (isTemp) {
                 heatParticles.forEach(p => {
                     if (p.userData.isOutside) {
-                        p.position.y += 0.02; 
-                        if (p.position.y > 7) p.position.y = 0;
+                        p.position.y += 0.02; if (p.position.y > 7) p.position.y = 0;
                     } else {
                         p.position.y += Math.sin(time + p.position.x) * 0.005; 
                     }
